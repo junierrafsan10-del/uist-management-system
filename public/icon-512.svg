@@ -1,0 +1,5 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="256" cy="256" r="256" fill="#00ACC1"/>
+  <polygon points="256,50 454,430 58,430" fill="white"/>
+  <text x="256" y="320" textAnchor="middle" fill="#00ACC1" fontSize="130" fontWeight="bold" fontFamily="DM Sans, sans-serif">U</text>
+</svg>
