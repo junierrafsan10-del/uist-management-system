@@ -41,39 +41,45 @@ export default function Login() {
 
     setLoading(true)
 
-    const { data, error: authError } = await signIn(email, password)
+    try {
+      const { data, error: authError } = await signIn(email, password)
 
-    if (authError) {
+      if (authError) {
+        setLoading(false)
+        setError(authError.message === 'Invalid login credentials'
+          ? 'Invalid email or password. Please try again.'
+          : authError.message)
+        setShake(true)
+        return
+      }
+
+      if (!data?.user) {
+        setLoading(false)
+        setError('Authentication failed. Please try again.')
+        setShake(true)
+        return
+      }
+
       setLoading(false)
-      setError(authError.message === 'Invalid login credentials'
-        ? 'Invalid email or password. Please try again.'
-        : authError.message)
-      setShake(true)
-      return
-    }
+      setSuccess(true)
 
-    if (!data?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+      const role = profile?.role || 'student'
+      const paths = { admin: '/admin-dashboard', teacher: '/teacher-dashboard', student: '/student-dashboard' }
+      const target = location.state?.from?.pathname || paths[role] || '/student-dashboard'
+
+      setTimeout(() => {
+        navigate(target, { replace: true })
+      }, 800)
+    } catch (err) {
       setLoading(false)
-      setError('Authentication failed. Please try again.')
+      setError(err?.message || 'An unexpected error occurred. Please try again.')
       setShake(true)
-      return
     }
-
-    setLoading(false)
-    setSuccess(true)
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user.id)
-      .single()
-    const role = profile?.role || 'student'
-    const paths = { admin: '/admin-dashboard', teacher: '/teacher-dashboard', student: '/student-dashboard' }
-    const target = location.state?.from?.pathname || paths[role] || '/student-dashboard'
-
-    setTimeout(() => {
-      navigate(target, { replace: true })
-    }, 800)
   }
 
   return (
