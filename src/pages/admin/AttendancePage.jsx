@@ -40,7 +40,7 @@ export default function AttendancePage() {
       const mappedStudents = (studentsRes.data || []).map(s => ({
         ...s,
         name: s.full_name,
-        course: s.course_id || '',
+        course: s.course || '',
       }))
       setStudents(mappedStudents)
       setCourses(coursesRes.data?.map(c => c.name) || [])
