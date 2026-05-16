@@ -64,7 +64,7 @@ export default function AdminDashboard() {
   const [studentForm, setStudentForm] = useState({
     name: '', email: '', phone: '', student_id: '', dept: 'CSE', year: '1st', sem: 1, address: ''
   })
-  const [noticeForm, setNoticeForm] = useState({ title: '', body: '' })
+  const [noticeForm, setNoticeForm] = useState({ title: '', body: '', category: 'Notice', is_published: true })
 
   const [teachers, setTeachers] = useState([])
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false)
@@ -202,13 +202,15 @@ export default function AdminDashboard() {
       const { error } = await supabase.from('notices').insert({
         title: noticeForm.title,
         body: noticeForm.body,
+        category: noticeForm.category,
+        is_published: noticeForm.is_published,
         date: new Date().toISOString().split('T')[0],
       })
 
       if (error) throw error
       addToast('Notice posted successfully!', 'success')
       setShowAddNoticeModal(false)
-      setNoticeForm({ title: '', body: '' })
+      setNoticeForm({ title: '', body: '', category: 'Notice', is_published: true })
       fetchDashboardData()
     } catch (error) {
       addToast('Failed to post notice: ' + error.message, 'error')
@@ -907,6 +909,25 @@ export default function AdminDashboard() {
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#F57C00]"
               placeholder="Notice title"
             />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-gray-500 block mb-1">Category</label>
+              <select value={noticeForm.category} onChange={(e) => setNoticeForm({ ...noticeForm, category: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#F57C00]">
+                <option value="Notice">Notice</option>
+                <option value="Academic">Academic</option>
+                <option value="Event">Event</option>
+                <option value="Urgent">Urgent</option>
+                <option value="Admission">Admission</option>
+                <option value="Exam">Exam</option>
+              </select>
+            </div>
+            <div className="flex items-end pb-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={noticeForm.is_published} onChange={(e) => setNoticeForm({ ...noticeForm, is_published: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-[#F57C00] focus:ring-[#F57C00]" />
+                <span className="text-sm text-gray-600">Publish immediately</span>
+              </label>
+            </div>
           </div>
           <div>
             <label className="text-sm text-gray-500 block mb-1">Content</label>
