@@ -76,6 +76,17 @@ export default function AdminDashboard() {
   })
   const [deleteTeacherConfirm, setDeleteTeacherConfirm] = useState('')
 
+  const [courses, setCourses] = useState([])
+  const [showAddCourseModal, setShowAddCourseModal] = useState(false)
+  const [showEditCourseModal, setShowEditCourseModal] = useState(false)
+  const [showDeleteCourseModal, setShowDeleteCourseModal] = useState(false)
+  const [selectedCourse, setSelectedCourse] = useState(null)
+  const [courseForm, setCourseForm] = useState({
+    name: '', code: '', department: 'CSE', duration_years: 4
+  })
+  const [deleteCourseConfirm, setDeleteCourseConfirm] = useState('')
+  const [departments, setDepartments] = useState([])
+
   const fetchDashboardData = async () => {
     try {
       const [studentsRes, teachersRes, noticesRes, teachersData] = await Promise.all([
@@ -94,6 +105,13 @@ export default function AdminDashboard() {
         dept_name: t.departments?.name || '',
       }))
       setTeachers(mappedTeachers)
+
+      const [coursesRes, deptsRes] = await Promise.all([
+        supabase.from('courses').select('*, departments(name)').order('name'),
+        supabase.from('departments').select('*').order('name'),
+      ])
+      setCourses(coursesRes.data || [])
+      setDepartments(deptsRes.data || [])
 
       const { data: studentsData } = await supabase
         .from('students')
@@ -118,7 +136,7 @@ export default function AdminDashboard() {
       setStats({
         students: studentsCount,
         teachers: teachersCount,
-        courses: 6,
+        courses: (coursesRes.data || []).length,
         placements: 45,
       })
       setRecentStudents(mappedStudents)
@@ -258,6 +276,69 @@ export default function AdminDashboard() {
       fetchDashboardData()
     } catch (error) {
       addToast('Failed to delete teacher: ' + error.message, 'error')
+    }
+  }
+
+  const handleAddCourse = async () => {
+    if (!courseForm.name || !courseForm.code) {
+      addToast('Course name and code are required', 'warning')
+      return
+    }
+    try {
+      const deptId = departments.find(d => d.code === courseForm.department)?.id
+      const { error } = await supabase.from('courses').insert({
+        name: courseForm.name,
+        code: courseForm.code,
+        department_id: deptId,
+        duration_years: courseForm.duration_years,
+        is_active: true,
+      })
+      if (error) throw error
+      addToast('Course added successfully!', 'success')
+      setShowAddCourseModal(false)
+      setCourseForm({ name: '', code: '', department: 'CSE', duration_years: 4 })
+      fetchDashboardData()
+    } catch (error) {
+      addToast('Failed to add course: ' + error.message, 'error')
+    }
+  }
+
+  const handleEditCourse = async () => {
+    if (!courseForm.name || !selectedCourse) return
+    try {
+      const deptId = departments.find(d => d.code === courseForm.department)?.id
+      const { error } = await supabase.from('courses').update({
+        name: courseForm.name,
+        code: courseForm.code,
+        department_id: deptId,
+        duration_years: courseForm.duration_years,
+      }).eq('id', selectedCourse.id)
+      if (error) throw error
+      addToast('Course updated successfully!', 'success')
+      setShowEditCourseModal(false)
+      setSelectedCourse(null)
+      fetchDashboardData()
+    } catch (error) {
+      addToast('Failed to update course: ' + error.message, 'error')
+    }
+  }
+
+  const handleDeleteCourse = async () => {
+    if (!selectedCourse) return
+    if (deleteCourseConfirm !== selectedCourse.name) {
+      addToast('Type course name to confirm', 'warning')
+      return
+    }
+    try {
+      const { error } = await supabase.from('courses').delete().eq('id', selectedCourse.id)
+      if (error) throw error
+      addToast('Course deleted!', 'success')
+      setShowDeleteCourseModal(false)
+      setSelectedCourse(null)
+      setDeleteCourseConfirm('')
+      fetchDashboardData()
+    } catch (error) {
+      addToast('Failed to delete course: ' + error.message, 'error')
     }
   }
 
@@ -525,9 +606,68 @@ export default function AdminDashboard() {
 
       case 'courses':
         return (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="font-semibold text-gray-800 text-lg mb-4">All Courses ({stats.courses})</h3>
-            <p className="text-gray-500 text-sm">Course management coming soon...</p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800 text-lg">All Courses ({courses.length})</h3>
+              <button
+                onClick={() => { setCourseForm({ name: '', code: '', department: 'CSE', duration_years: 4 }); setShowAddCourseModal(true) }}
+                className="px-4 py-2 bg-[#0f2040] text-white rounded-xl text-sm font-medium"
+              >
+                + Add Course
+              </button>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      <th className="px-4 py-3 font-medium">Code</th>
+                      <th className="px-4 py-3 font-medium">Course Name</th>
+                      <th className="px-4 py-3 font-medium">Department</th>
+                      <th className="px-4 py-3 text-center font-medium">Duration (yrs)</th>
+                      <th className="px-4 py-3 text-center font-medium">Status</th>
+                      <th className="px-4 py-3 text-center font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {courses.map((c, i) => (
+                      <motion.tr
+                        key={c.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: i * 0.02 }}
+                        className="hover:bg-gray-50/50"
+                      >
+                        <td className="px-4 py-3 font-mono text-gray-600">{c.code}</td>
+                        <td className="px-4 py-3 font-medium text-gray-800">{c.name}</td>
+                        <td className="px-4 py-3 text-gray-600">{c.departments?.name || '-'}</td>
+                        <td className="px-4 py-3 text-center text-gray-600">{c.duration_years}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {c.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={() => { setSelectedCourse(c); setCourseForm({ name: c.name, code: c.code, department: c.departments?.code || 'CSE', duration_years: c.duration_years }); setShowEditCourseModal(true) }}
+                              className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title="Edit"
+                            >✏️</button>
+                            <button
+                              onClick={() => { setSelectedCourse(c); setShowDeleteCourseModal(true) }}
+                              className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Delete"
+                            >🗑️</button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {courses.length === 0 && (
+                <div className="p-8 text-center text-gray-500">No courses found. Add your first course.</div>
+              )}
+            </div>
           </div>
         )
 
@@ -846,6 +986,65 @@ export default function AdminDashboard() {
           <div>
             <label className="text-sm text-gray-500 block mb-1">Type teacher name to confirm</label>
             <input type="text" value={deleteTeacherConfirm} onChange={(e) => setDeleteTeacherConfirm(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-red-500" placeholder={selectedTeacher?.full_name} />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showAddCourseModal || showEditCourseModal}
+        onClose={() => { setShowAddCourseModal(false); setShowEditCourseModal(false); setSelectedCourse(null) }}
+        title={showEditCourseModal ? 'Edit Course' : 'Add New Course'}
+        footer={
+          <>
+            <button onClick={() => { setShowAddCourseModal(false); setShowEditCourseModal(false); setSelectedCourse(null) }} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium">Cancel</button>
+            <button onClick={showEditCourseModal ? handleEditCourse : handleAddCourse} className="px-4 py-2 bg-[#0f2040] text-white rounded-xl text-sm font-medium">
+              {showEditCourseModal ? 'Update' : 'Add'} Course
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-gray-500 block mb-1">Course Name *</label>
+              <input type="text" value={courseForm.name} onChange={(e) => setCourseForm({ ...courseForm, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#F57C00]" placeholder="Computer Science and Technology" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-500 block mb-1">Course Code *</label>
+              <input type="text" value={courseForm.code} onChange={(e) => setCourseForm({ ...courseForm, code: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#F57C00]" placeholder="CST" disabled={showEditCourseModal} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-gray-500 block mb-1">Department</label>
+              <select value={courseForm.department} onChange={(e) => setCourseForm({ ...courseForm, department: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#F57C00]">
+                {departments.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-gray-500 block mb-1">Duration (years)</label>
+              <input type="number" value={courseForm.duration_years} onChange={(e) => setCourseForm({ ...courseForm, duration_years: parseInt(e.target.value) || 4 })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#F57C00]" min="1" max="6" />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showDeleteCourseModal}
+        onClose={() => { setShowDeleteCourseModal(false); setDeleteCourseConfirm(''); setSelectedCourse(null) }}
+        title="Delete Course"
+        footer={
+          <>
+            <button onClick={() => { setShowDeleteCourseModal(false); setDeleteCourseConfirm(''); setSelectedCourse(null) }} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium">Cancel</button>
+            <button onClick={handleDeleteCourse} className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600">Delete</button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600">Are you sure you want to delete <strong>{selectedCourse?.name}</strong>? This action cannot be undone.</p>
+          <div>
+            <label className="text-sm text-gray-500 block mb-1">Type course name to confirm</label>
+            <input type="text" value={deleteCourseConfirm} onChange={(e) => setDeleteCourseConfirm(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-red-500" placeholder={selectedCourse?.name} />
           </div>
         </div>
       </Modal>
